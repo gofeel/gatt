@@ -43,7 +43,8 @@ type PlatData struct {
 	Connectable bool
 	RSSI        int8
 
-	Conn io.ReadWriteCloser
+	Conn        io.ReadWriteCloser
+	mu          *sync.Mutex
 }
 
 func NewHCI(devID int, chk bool, maxConn int) (*HCI, error) {
@@ -258,8 +259,10 @@ func (h *HCI) handleAdvertisement(b []byte) {
 			pd, ok := h.plist[addr]
 			h.plistmu.Unlock()
 			if ok {
+				pd.mu.Lock()
 				pd.Data = append(pd.Data, ep.Data[i]...)
 				h.AdvertisementHandler(pd)
+				pd.mu.Unlock()
 			}
 			continue
 		}
@@ -270,6 +273,7 @@ func (h *HCI) handleAdvertisement(b []byte) {
 			Data:        ep.Data[i],
 			Connectable: connectable,
 			RSSI:        ep.RSSI[i],
+			mu:           &sync.Mutex{},
 		}
 		h.plistmu.Lock()
 		h.plist[addr] = pd
@@ -280,7 +284,9 @@ func (h *HCI) handleAdvertisement(b []byte) {
 		}
 		*/
 		_=scannable
+		pd.mu.Lock()
 		h.AdvertisementHandler(pd)
+		pd.mu.Unlock()
 	}
 }
 
