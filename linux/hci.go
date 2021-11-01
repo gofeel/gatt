@@ -18,6 +18,7 @@ type HCI struct {
 	d io.ReadWriteCloser
 	c *cmd.Cmd
 	e *evt.Evt
+	sp *cmd.LESetScanParameters
 
 	plist   map[bdaddr]*PlatData
 	plistmu *sync.Mutex
@@ -47,7 +48,7 @@ type PlatData struct {
 	mu          *sync.Mutex
 }
 
-func NewHCI(devID int, chk bool, maxConn int) (*HCI, error) {
+func NewHCI(devID int, chk bool, maxConn int, sp *cmd.LESetScanParameters) (*HCI, error) {
 	d, err := newDevice(devID, chk)
 	if err != nil {
 		return nil, err
@@ -59,6 +60,7 @@ func NewHCI(devID int, chk bool, maxConn int) (*HCI, error) {
 		d: d,
 		c: c,
 		e: e,
+		sp: sp,
 
 		plist:   make(map[bdaddr]*PlatData),
 		plistmu: &sync.Mutex{},
@@ -223,13 +225,7 @@ func (h *HCI) resetDevice() error {
 			HostSynchronousDataPacketLength:    0xff,
 			HostTotalNumACLDataPackets:         0x0014,
 			HostTotalNumSynchronousDataPackets: 0x000a},
-		cmd.LESetScanParameters{
-			LEScanType:           0x00,   // [0x00]: passive, 0x01: active
-			LEScanInterval:       0x0010, // [0x10]: 0.625ms * 16
-			LEScanWindow:         0x0010, // [0x10]: 0.625ms * 16
-			OwnAddressType:       0x00,   // [0x00]: public, 0x01: random
-			ScanningFilterPolicy: 0x00,   // [0x00]: accept all, 0x01: ignore non-white-listed.
-		},
+		h.sp,
 	}
 	for _, s := range seq {
 		if err := h.c.SendAndCheckResp(s, []byte{0x00}); err != nil {
@@ -252,7 +248,7 @@ func (h *HCI) handleAdvertisement(b []byte) {
 		addr := bdaddr(ep.Address[i])
 		et := ep.EventType[i]
 		connectable := et == advInd || et == advDirectInd
-		scannable := et == advInd || et == advScanInd
+		scannable := h.sp.LEScanType == 0x01 && (et == advInd || et == advScanInd)
 
 		if et == scanRsp {
 			h.plistmu.Lock()
@@ -278,12 +274,9 @@ func (h *HCI) handleAdvertisement(b []byte) {
 		h.plistmu.Lock()
 		h.plist[addr] = pd
 		h.plistmu.Unlock()
-		/*
 		if scannable {
 			continue
 		}
-		*/
-		_=scannable
 		pd.mu.Lock()
 		h.AdvertisementHandler(pd)
 		pd.mu.Unlock()

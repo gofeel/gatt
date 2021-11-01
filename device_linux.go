@@ -54,7 +54,7 @@ func NewDevice(opts ...Option) (Device, error) {
 	}
 
 	d.Option(opts...)
-	h, err := linux.NewHCI(d.devID, d.chkLE, d.maxConn)
+	h, err := linux.NewHCI(d.devID, d.chkLE, d.maxConn, d.scanParam)
 	if err != nil {
 		return nil, err
 	}
