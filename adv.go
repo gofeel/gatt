@@ -2,7 +2,7 @@ package gatt
 
 import (
 	"errors"
-	_ "log"
+	"log"
 )
 
 // MaxEIRPacketLength is the maximum allowed AdvertisingPacket
@@ -130,11 +130,17 @@ func (a *Advertisement) unmarshall(b []byte) error {
 		case typeManufacturerData:
 			a.ManufacturerData = make([]byte, len(d))
 			copy(a.ManufacturerData, d)
-		// case typeServiceData16,
+		case typeServiceData16:
+			service := ServiceData{}
+			_ = service
+			uuid := UUID {b:d[0:2]}
+			service.UUID = uuid
+			service.Data = d[2:]
+			a.ServiceData = append(a.ServiceData, service)
 		// case typeServiceData32,
 		// case typeServiceData128:
 		default:
-			//log.Printf("DATA: [ % X ]", d)
+			log.Printf("DATA: [ % X ]", d)
 		}
 		b = b[1+l:]
 	}
